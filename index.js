@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+
 export function buildRefreshRequest({ tokenUrl, clientId, clientSecret, refreshToken, scope }) {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -6,6 +8,7 @@ export function buildRefreshRequest({ tokenUrl, clientId, clientSecret, refreshT
     client_secret: clientSecret,
   });
   if (scope) body.set('scope', scope);
+
   return {
     url: tokenUrl,
     options: {
@@ -16,13 +19,33 @@ export function buildRefreshRequest({ tokenUrl, clientId, clientSecret, refreshT
   };
 }
 
+export function maskSecret(value = '') {
+  if (!value) return '';
+  if (value.length <= 6) return '*'.repeat(value.length);
+  return `${value.slice(0, 3)}***${value.slice(-3)}`;
+}
+
 export async function refreshAccessToken(config, fetchImpl = fetch) {
   const request = buildRefreshRequest(config);
   const response = await fetchImpl(request.url, request.options);
-  if (!response.ok) throw new Error(`Refresh failed with status ${response.status}`);
-  return response.json();
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Refresh failed with status ${response.status}: ${payload.error || 'unknown_error'}`);
+  }
+  return payload;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(buildRefreshRequest({ tokenUrl: 'https://example.com/oauth/token', clientId: 'demo', clientSecret: 'secret', refreshToken: 'refresh-token' }));
+export async function saveTokenPayload(filePath, payload) {
+  await fs.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+  return filePath;
+}
+
+export function summarizeConfig(config) {
+  return {
+    tokenUrl: config.tokenUrl,
+    clientId: config.clientId,
+    clientSecret: maskSecret(config.clientSecret),
+    refreshToken: maskSecret(config.refreshToken),
+    scope: config.scope || null,
+  };
 }
