@@ -1,81 +1,42 @@
 # oauth-refresher
 
-A small dependency-free Node.js CLI and library for OAuth refresh-token workflows.
+Build, send and refresh OAuth 2.0 access tokens via `refresh_token` grant — library
+plus small CLI for ops scripts.
 
-It is useful when you need a lightweight helper that can refresh an access token from a server, cron job, local script, Termux workflow, or CI job without pulling in a large SDK.
-
-## Status
-
-This repository is no longer just a placeholder. It now includes:
-
-- CLI entrypoint: `cli.js`
-- Reusable library functions: `index.js`
-- Package metadata and npm scripts: `package.json`
-- Node test coverage: `test/index.test.js`
-
-## Requirements
-
-- Node.js 18 or newer
-- An OAuth provider that supports the refresh-token grant
-
-## Install locally
-
-```bash
-git clone https://github.com/imranshiundu/oauth-refresher.git
-cd oauth-refresher
-npm test
-```
-
-## Run with environment variables
-
-```bash
-OAUTH_TOKEN_URL=https://provider.example/token \
-OAUTH_CLIENT_ID=your-client-id \
-OAUTH_CLIENT_SECRET=your-client-secret \
-OAUTH_REFRESH_TOKEN=your-refresh-token \
-node cli.js --dry-run
-```
-
-## Run with a config file
-
-Create `oauth.json`:
-
-```json
-{
-  "tokenUrl": "https://provider.example/token",
-  "clientId": "your-client-id",
-  "clientSecret": "your-client-secret",
-  "refreshToken": "your-refresh-token"
-}
-```
-
-Then run:
-
-```bash
-node cli.js --config oauth.json --token-only
-```
-
-## Save the token payload
-
-```bash
-node cli.js --config oauth.json --out token.json
-```
-
-## Use as a library
+## Library
 
 ```js
-import { refreshAccessToken } from './index.js';
+import { buildRefreshRequest, refreshAccessToken } from './index.js';
 
-const token = await refreshAccessToken({
-  tokenUrl: process.env.OAUTH_TOKEN_URL,
+const request = buildRefreshRequest({
+  tokenUrl: 'https://provider.example/oauth/token',
   clientId: process.env.OAUTH_CLIENT_ID,
   clientSecret: process.env.OAUTH_CLIENT_SECRET,
   refreshToken: process.env.OAUTH_REFRESH_TOKEN,
+  scope: 'read offline_access',         // optional
 });
 
-console.log(token.access_token);
+const { accessToken, expireIn } = await refreshAccessToken(config /* + custom fetchImpl */);
 ```
 
-## Security notes
+| Export | Purpose |
+|---|---|
+| `buildRefreshRequest({tokenUrl, clientId, clientSecret, refreshToken, scope})` | serializes a standard `grant_type=refresh_token` body |
+| `refreshAccessToken(config[, fetchImpl])` | posts it, returns new access token info |
 
-Never commit real OAuth secrets, refresh tokens, or generated token files. Keep config files local, use environment variables for deployment, and rotate credentials immediately if a token is exposed.
+## CLI
+
+```bash
+node cli.js --help
+```
+
+## Secret hygiene
+
+On verbose/debug output (`maskSecret`), both `clientSecret` and `refreshToken` are
+masked to partial forms — debugging logs never print a usable full credential.
+
+## Tests
+
+```bash
+npm test
+```
